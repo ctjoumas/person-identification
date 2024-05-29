@@ -1,6 +1,0 @@
-{
-  "ApiKey": "<YOUR_KEY>",
-  "ApiDeploymentName": "<YOUR_DEPLOYMENT>",
-  "ApiEndpoint": "<YOUR_ENDPOINT>",
-  "BlobConnection": "<YOUR_ENDPOINT>"
-}
