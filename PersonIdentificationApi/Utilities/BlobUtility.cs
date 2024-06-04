@@ -2,7 +2,6 @@
 {
     using Azure.Storage.Blobs;
     using Azure.Storage.Sas;
-    using System.Xml.Linq;
 
     public class BlobUtility
     {
@@ -16,7 +15,7 @@
         /// <returns></returns>
         public Uri GetBlobUri(string fileName)
         {
-            Uri uri = null;
+            Uri? uri = null;
             BlobClient blobClient = new BlobClient(ConnectionString, ContainerName, fileName);
 
             if (blobClient.Exists())
@@ -35,6 +34,20 @@
             }
 
             return uri;
+        }
+
+        public async Task<byte[]> DownloadBlobStreamAsync(string sasUrl)
+        {
+            var blobClient = new BlobClient(new Uri(sasUrl));
+
+            byte[] blobContent;
+            using (var memoryStream = new MemoryStream())
+            {
+                await blobClient.DownloadToAsync(memoryStream);
+                blobContent = memoryStream.ToArray();
+            }
+
+            return blobContent;
         }
     }
 }

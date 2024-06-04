@@ -1,6 +1,10 @@
 ﻿namespace PersonIdentificationApi.Controllers
 {
     using Microsoft.AspNetCore.Mvc;
+    using Microsoft.Azure.CognitiveServices.Vision.Face.Models;
+    using Microsoft.Azure.CognitiveServices.Vision.Face;
+    using Microsoft.Extensions.Options;
+    using PersonIdentification.FaceService;
     using PersonIdentificationApi.Helpers;
     using PersonIdentificationApi.Utilities;
     using System.Text.Json;
@@ -9,6 +13,17 @@
     [Route("[controller]")]
     public class PersonIdentificationRunner : ControllerBase
     {
+        private readonly IFaceService _faceService;
+        private readonly ILogger<PersonIdentificationRunner> _logger;
+        private readonly FaceSettings _faceSettings;
+
+        public PersonIdentificationRunner(IFaceService faceService, ILogger<PersonIdentificationRunner> logger, IOptions<FaceSettings> faceSettings)
+        {
+            _faceService = faceService;
+            _logger = logger;
+            _faceSettings = faceSettings.Value;
+        }
+
         /// <summary>
         /// This API will accept a JSON payload in the format of
         /// {
@@ -24,24 +39,18 @@
         /// }
         /// </summary>
         /// <returns></returns>
-        [HttpPost("StartTraining")]
+        [HttpPost("training/train")]
         [ProducesResponseType(200)]
         [ProducesResponseType(400)]
         [ProducesResponseType(500)]
-        public async Task<ActionResult> TrainingRunner()
+        public async Task<ActionResult> TrainingRunner([FromBody] ProcessModel processModel)
         {
             try
             {
-                // pull out the JSON from the body and deserialize it in order to get the images and the process 
-                var request = HttpContext.Request;
-                using var stream = new StreamReader(request.Body);
-                var body = stream.ReadToEndAsync();
-
-                var processModel = JsonSerializer.Deserialize<ProcessModel>(body.Result);
-
+                var imagesToTrain = new List<string>();
+                
                 if (processModel.Process.Equals("Training"))
                 {
-
                     BlobUtility blobUtility = new BlobUtility();
                     blobUtility.ConnectionString = Helper.GetEnvironmentVariable("BlobConnectionString");
                     blobUtility.ContainerName = Helper.GetEnvironmentVariable("ContainerName");
@@ -55,6 +64,10 @@
                         {
                             Console.WriteLine($"File does not exist: {image.Filename}");
                         }
+                        else
+                        {
+                            imagesToTrain.Add(imageUri.ToString());
+                        }
                     }
                 }
                 else
@@ -63,14 +76,13 @@
                 }
 
                 // run the training process
-                // TBD
+                var groupId = await _faceService.TrainAsync(imagesToTrain);
 
-
-                return Ok("Long-running process started in the background");
+                return Ok(groupId);
             }
             catch (Exception ex)
             {
-                return BadRequest($"An error occured: {ex.Message}");
+                return StatusCode(500, ex.Message);
             }
         }
 
@@ -86,7 +98,7 @@
         /// }
         /// </summary>
         /// <returns></returns>
-        [HttpGet("StartIdentification")]
+        [HttpPost("training/identification")]
         [ProducesResponseType(200)]
         [ProducesResponseType(400)]
         [ProducesResponseType(500)]
@@ -130,7 +142,21 @@
             }
             catch (Exception ex)
             {
-                return BadRequest($"An error occured: {ex.Message}");
+                return StatusCode(500, ex.Message);
+            }
+        }
+
+        [HttpGet("trainingStatus/{personGroupId}")]
+        public async Task<IActionResult> GetTrainingStatusAsync(string personGroupId)
+        {
+            try
+            {
+                var trainingStatus = await _faceService.GetTrainingStatusAsync(personGroupId);
+                return Ok(trainingStatus);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, ex.Message);
             }
         }
     }

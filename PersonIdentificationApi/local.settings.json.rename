@@ -1,4 +1,0 @@
-{
-  "BlobConnectionString": "<your blob connection string>",
-  "ContainerName": "<your container name>"
-}
