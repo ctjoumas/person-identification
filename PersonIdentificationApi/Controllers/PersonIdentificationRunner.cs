@@ -134,6 +134,7 @@
                     //   - call OCR API
                     var imagesToIdentify = processModel.Images.Select(x => x.Filename).ToList();
                     var identificationResponse =  await _faceService.DetectFaceRecognize(imagesToIdentify);
+                    _logger.LogInformation($"Identification response: {JsonSerializer.Serialize(identificationResponse)}");
                 }
                 else
                 {

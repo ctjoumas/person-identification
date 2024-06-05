@@ -32,23 +32,48 @@ namespace PersonIdentificationApi.Services
             return await db.ExecuteAsync(query, personGroupImage);
         }
 
-        public async Task<(Guid personGroupId, string blobUrl)> GetPersonGroupAsync(string blobName)
+        // Gets all person groups that have been trained.
+        public async Task<List<DbPersonGroupImage>> GetPersonGroupAsync(Guid personGroupId)
         {
             using IDbConnection db = new SqlConnection(_connectionString);
 
             string query = @"
-                SELECT PersonGroupId, BlobUrl
-                FROM PersonGroupImages
-                WHERE BlobName = @BlobName";
+                SELECT 
+                pg.[PersonGroupId],
+                pgi.BlobName,
+                pgi.BlobUrl
+                FROM [dbo].[PersonGroup] pg
+                JOIN [dbo].[PersonGroupImages] pgi on pg.PersonGroupId = pgi.PersonGroupId
+                WHERE pg.PersonGroupId = @PersonGroupId";
 
-            var groupWithUrl = await db.QueryFirstOrDefaultAsync<(Guid, string)>(query, new { BlobName = blobName });
+            var personGroupImages = await db.QueryAsync<DbPersonGroupImage>(query);
 
-            return groupWithUrl;
+            return personGroupImages.ToList();
+        }
+
+        // Gets all person groups that have been trained.
+        public async Task<List<DbPersonGroupImage>> GetPersonGroupsAsync()
+        {
+            using IDbConnection db = new SqlConnection(_connectionString);
+
+            string query = @"
+                SELECT 
+                pg.[PersonGroupId],
+                pgi.BlobName,
+                pgi.BlobUrl
+                FROM [dbo].[PersonGroup] pg
+                JOIN [dbo].[PersonGroupImages] pgi on pg.PersonGroupId = pgi.PersonGroupId
+                WHERE pg.IsTrained = 1";
+
+            var personGroupImages = await db.QueryAsync<DbPersonGroupImage>(query);
+
+            return personGroupImages.ToList();
         }
 
         public async Task DeletePersonGroupAsync(Guid personGroupId)
         {
             using IDbConnection db = new SqlConnection(_connectionString);
+
             string query = @"
                 UPDATE PersonGroup
                 SET IsDeleted = 1,
