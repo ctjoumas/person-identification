@@ -1,4 +1,6 @@
 {
   "BlobConnectionString": "<your blob connection string>",
-  "ContainerName": "<your container name>"
+  "ContainerName": "<your container name>",
+  "MLEndpoint": "<your ML model endpoint",
+  "MLKey": "<your ML key>"
 }

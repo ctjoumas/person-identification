@@ -1,9 +1,13 @@
 ﻿namespace PersonIdentificationApi.Controllers
 {
+    using Microsoft.AspNetCore.DataProtection.KeyManagement;
     using Microsoft.AspNetCore.Mvc;
+    using Microsoft.Azure.CognitiveServices.Vision.Face;
+    using Microsoft.Azure.CognitiveServices.Vision.Face.Models;
     using PersonIdentificationApi.Helpers;
     using PersonIdentificationApi.Utilities;
     using System.Text.Json;
+    using static System.Net.WebRequestMethods;
 
     [ApiController]
     [Route("[controller]")]
@@ -114,17 +118,21 @@
                     {
                         Console.WriteLine($"File does not exist: {processModel.Images[0].Filename}");
                     }
+                    else
+                    {
+                        // run the pipeline to include
+                        // - call segmentation API (return list of person objects)
+                        Segmentation segmentation = new Segmentation(processModel.Images[0].Filename, imageUri.AbsoluteUri);
+                        List<string> segmentedImages = await segmentation.RunSegmentation();
+                        // - loop through each person object and
+                        //   - call Face API
+                        //   - call OCR API
+                    }
                 }
                 else
                 {
                     return BadRequest($"Invalid process specified. Recieved '{processModel.Process}' but expected 'Identification'");
-                }
-
-                // run the pipeline to include
-                // - call segmentation API (return list of person objects)
-                // - loop through each person object and
-                //   - call Face API
-                //   - call OCR API
+                }                
 
                 return Ok("Long-running process started in the background");
             }

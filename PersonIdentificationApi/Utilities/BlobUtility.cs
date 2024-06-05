@@ -36,5 +36,33 @@
 
             return uri;
         }
+
+        public async Task<byte[]> DownloadBlobStreamAsync(string sasUrl)
+        {
+            var blobClient = new BlobClient(new Uri(sasUrl));
+
+            byte[] blobContent;
+            using (var memoryStream = new MemoryStream())
+            {
+                await blobClient.DownloadToAsync(memoryStream);
+                blobContent = memoryStream.ToArray();
+            }
+
+            return blobContent;
+        }
+
+        /// <summary>
+        /// Uploads a file's stream to the storage account container. This will overwrite a file
+        /// that has the same name.
+        /// </summary>
+        /// <param name="imageMemoryStream">Memory stream object of the file being uploaded</param>
+        /// <param name="fileName">The name of the file</param>
+        /// <returns></returns>
+        public async Task UploadFromStreamAsync(MemoryStream imageMemoryStream, string fileName)
+        {
+            BlobClient blobClient = new BlobClient(ConnectionString, ContainerName, fileName);
+            imageMemoryStream.Position = 0;
+            await blobClient.UploadAsync(imageMemoryStream, true);
+        }
     }
 }
