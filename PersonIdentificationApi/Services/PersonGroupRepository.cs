@@ -14,22 +14,31 @@ namespace PersonIdentificationApi.Services
             _connectionString = connectionString;
         }
 
-        public async Task<int> InsertPersonGroupAsync(DbPersonGroup personGroup)
+        public async Task<int> InsertPersonGroupAsync(IDbConnection dbConnection, DbPersonGroup personGroup)
         {
-            using IDbConnection db = new SqlConnection(_connectionString);
             string query = @"
-                INSERT INTO PersonGroup (PersonGroupId, IsTrained, IsDeleted, CreatedBy)
-                VALUES (@PersonGroupId, @IsTrained, @IsDeleted, @CreatedBy)";
-            return await db.ExecuteAsync(query, personGroup);
+                INSERT INTO PersonGroup (PersonGroupId, IsTrained, CreatedBy)
+                VALUES (@PersonGroupId, @IsTrained, @CreatedBy)";
+
+            return await dbConnection.ExecuteAsync(query, personGroup);
         }
 
-        public async Task<int> InsertPersonGroupImageAsync(DbPersonGroupImage personGroupImage)
+        public async Task<int> InsertPersonGroupImageAsync(IDbConnection dbConnection, DbPersonGroupImage personGroupImage)
         {
-            using IDbConnection db = new SqlConnection(_connectionString);
             string query = @"
-                INSERT INTO PersonGroupImages (PersonGroupImageId, PersonGroupId, BlobName, BlobUrl, CreatedBy)
-                VALUES (@PersonGroupImageId, @PersonGroupId, @BlobName, @BlobUrl, @CreatedBy)";
-            return await db.ExecuteAsync(query, personGroupImage);
+                INSERT INTO PersonGroupImage (PersonId, PersonGroupId, BlobName, BlobUrl, CreatedBy)
+                VALUES (@PersonId, @BlobName, @BlobUrl, @CreatedBy)";
+
+            return await dbConnection.ExecuteAsync(query, personGroupImage);
+        }
+
+        public async Task<int> InsertPersonFaceAsync(IDbConnection dbConnection, DbPersonFace personFace)
+        {
+            string query = @"
+                INSERT INTO PersonFace (FaceId, PersonId, CreatedBy)
+                VALUES (@FaceId, @PersonId, @CreatedBy)";
+
+            return await dbConnection.ExecuteAsync(query, personFace);
         }
 
         // Gets all person groups that have been trained.
@@ -54,7 +63,7 @@ namespace PersonIdentificationApi.Services
         // Gets all person groups that have been trained.
         public async Task<List<DbPersonGroupImage>> GetPersonGroupsAsync()
         {
-            using IDbConnection db = new SqlConnection(_connectionString);
+            using IDbConnection dbConnection = new SqlConnection(_connectionString);
 
             string query = @"
                 SELECT 
@@ -65,7 +74,7 @@ namespace PersonIdentificationApi.Services
                 JOIN [dbo].[PersonGroupImages] pgi on pg.PersonGroupId = pgi.PersonGroupId
                 WHERE pg.IsTrained = 1";
 
-            var personGroupImages = await db.QueryAsync<DbPersonGroupImage>(query);
+            var personGroupImages = await dbConnection.QueryAsync<DbPersonGroupImage>(query);
 
             return personGroupImages.ToList();
         }
@@ -82,6 +91,40 @@ namespace PersonIdentificationApi.Services
                 WHERE PersonGroupId = @PersonGroupId";
 
             await db.ExecuteAsync(query, new { PersonGroupId = personGroupId });
+        }
+
+        public async Task SavePersonGroupAllAsync(
+            DbPersonGroup dbPersonGroup,
+            List<DbPersonGroupImage> dbPersonGroupImages,
+            List<DbPersonFace> dbPersonFaces)
+        {
+            using IDbConnection dbConnection = new SqlConnection(_connectionString);
+            dbConnection.Open();
+            using IDbTransaction transaction = dbConnection.BeginTransaction();
+
+            try
+            {
+                // Execute your methods here, passing the transaction object
+                await InsertPersonGroupAsync(dbConnection, dbPersonGroup);
+
+                foreach(var dbPersonGroupImage in dbPersonGroupImages)
+                {
+                    await InsertPersonGroupImageAsync(dbConnection, dbPersonGroupImage);
+                }
+
+                foreach(var dbPersonFace in dbPersonFaces)
+                {
+                    await InsertPersonFaceAsync(dbConnection, dbPersonFace);
+                }
+
+                transaction.Commit();
+            }
+            catch (Exception)
+            {
+                // Rollback the transaction in case of any failure
+                transaction.Rollback();
+                throw;
+            }
         }
     }
 }

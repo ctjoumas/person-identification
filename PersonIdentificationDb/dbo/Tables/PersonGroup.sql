@@ -8,4 +8,3 @@
     [ModifiedDate]  DATETIME         NULL,
     PRIMARY KEY CLUSTERED ([PersonGroupId] ASC)
 );
-
