@@ -184,7 +184,7 @@ namespace PersonIdentification.FaceService
                                 var person = await faceClient.PersonGroupPerson.CreateAsync(personGroupId, detectedFace.FaceId.ToString());
                                 var dbPersonGroupImage = new DbPersonGroupImage();
                                 dbPersonGroupImage.PersonId = person.PersonId;
-
+                                
                                 // Crop the image to only include the detected face
                                 var faceRectangle = detectedFace.FaceRectangle;
                                 var croppedImage = CropImage(blobContent, faceRectangle);
