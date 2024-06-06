@@ -52,7 +52,7 @@ namespace PersonIdentificationApi.Services
                 pgi.BlobName,
                 pgi.BlobUrl
                 FROM [dbo].[PersonGroup] pg
-                JOIN [dbo].[PersonGroupImages] pgi on pg.PersonGroupId = pgi.PersonGroupId
+                JOIN [dbo].[PersonGroupImage] pgi on pg.PersonGroupId = pgi.PersonGroupId
                 WHERE pg.IsTrained = 1";
 
             var personGroupImages = await dbConnection.QueryAsync<DbPersonGroupImage>(query);
