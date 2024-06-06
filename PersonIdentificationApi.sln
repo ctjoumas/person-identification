@@ -3,7 +3,9 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.9.34902.65
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PersonIdentificationApi", "PersonIdentificationApi\PersonIdentificationApi.csproj", "{597382E4-67C5-43AF-96A2-244BEF519264}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "PersonIdentificationApi", "PersonIdentificationApi\PersonIdentificationApi.csproj", "{597382E4-67C5-43AF-96A2-244BEF519264}"
+EndProject
+Project("{00D1A9C2-B5F0-4AF3-8072-F6C62B433612}") = "PersonIdentificationDb", "PersonIdentificationDb\PersonIdentificationDb.sqlproj", "{BFE60427-152F-4EDC-BF2C-9ACEB919EA49}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -15,6 +17,12 @@ Global
 		{597382E4-67C5-43AF-96A2-244BEF519264}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{597382E4-67C5-43AF-96A2-244BEF519264}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{597382E4-67C5-43AF-96A2-244BEF519264}.Release|Any CPU.Build.0 = Release|Any CPU
+		{BFE60427-152F-4EDC-BF2C-9ACEB919EA49}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{BFE60427-152F-4EDC-BF2C-9ACEB919EA49}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{BFE60427-152F-4EDC-BF2C-9ACEB919EA49}.Debug|Any CPU.Deploy.0 = Debug|Any CPU
+		{BFE60427-152F-4EDC-BF2C-9ACEB919EA49}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{BFE60427-152F-4EDC-BF2C-9ACEB919EA49}.Release|Any CPU.Build.0 = Release|Any CPU
+		{BFE60427-152F-4EDC-BF2C-9ACEB919EA49}.Release|Any CPU.Deploy.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

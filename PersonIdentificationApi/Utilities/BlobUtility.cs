@@ -2,7 +2,6 @@
 {
     using Azure.Storage.Blobs;
     using Azure.Storage.Sas;
-    using System.Xml.Linq;
 
     public class BlobUtility
     {
@@ -13,10 +12,10 @@
         /// Gets the SAS URI of the file specified. If the file does not exist, a null URI is returned.
         /// </summary>
         /// <param name="fileName">Name of the image in the storage account container</param>
-        /// <returns></returns>
-        public Uri GetBlobUri(string fileName)
+        /// <returns>Uri</returns>
+        public Uri GetBlobSasUri(string fileName)
         {
-            Uri uri = null;
+            Uri? sasUri = null;
             BlobClient blobClient = new BlobClient(ConnectionString, ContainerName, fileName);
 
             if (blobClient.Exists())
@@ -31,10 +30,24 @@
                 sasBuilder.ExpiresOn = DateTimeOffset.UtcNow.AddDays(1);
                 sasBuilder.SetPermissions(BlobSasPermissions.Read);
 
-                uri = blobClient.GenerateSasUri(sasBuilder);
+                sasUri = blobClient.GenerateSasUri(sasBuilder);
             }
 
-            return uri;
+            return sasUri;
+        }
+
+        public async Task<byte[]> DownloadBlobStreamAsync(string sasUrl)
+        {
+            var blobClient = new BlobClient(new Uri(sasUrl));
+
+            byte[] blobContent;
+            using (var memoryStream = new MemoryStream())
+            {
+                await blobClient.DownloadToAsync(memoryStream);
+                blobContent = memoryStream.ToArray();
+            }
+
+            return blobContent;
         }
 
         public async Task<byte[]> DownloadBlobStreamAsync(string sasUrl)
