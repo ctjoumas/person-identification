@@ -1,5 +1,6 @@
 ﻿CREATE TABLE [dbo].[PersonGroup] (
     [PersonGroupId] UNIQUEIDENTIFIER NOT NULL,
+    [PersonGroupName] NVARCHAR (100) NOT NULL,
     [IsTrained]     BIT              NULL,
     [IsDeleted]     BIT              NULL,
     [CreatedBy]     VARCHAR (50)     NOT NULL DEFAULT 'system',

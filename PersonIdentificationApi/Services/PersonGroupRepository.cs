@@ -17,8 +17,8 @@ namespace PersonIdentificationApi.Services
         public async Task<int> InsertPersonGroupAsync(IDbConnection dbConnection, DbPersonGroup personGroup, IDbTransaction transaction)
         {
             string query = @"
-                INSERT INTO PersonGroup (PersonGroupId, IsTrained)
-                VALUES (@PersonGroupId, @IsTrained)";
+                INSERT INTO PersonGroup (PersonGroupId, PersonGroupName, IsTrained)
+                VALUES (@PersonGroupId, @PersonGroupName, @IsTrained)";
 
             return await dbConnection.ExecuteAsync(query, personGroup, transaction);
         }

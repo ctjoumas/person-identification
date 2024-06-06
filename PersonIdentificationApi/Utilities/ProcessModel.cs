@@ -9,6 +9,9 @@
 
         [JsonPropertyName("process")]
         public string Process {  get; set; }
+
+        [JsonPropertyName("personGroupName")]
+        public string GroupName { get; set; }
     }
 
     public class Image

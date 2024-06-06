@@ -1,6 +1,13 @@
 {
-  "BlobConnectionString": "<your blob connection string>",
-  "ContainerName": "<your container name>",
+  "BlobConnectionString": "",
+  "ContainerName": "images",
+  "FaceSettings": {
+    "SubscriptionKey": "",
+    "EndPoint": ""
+  },
+  "ConnectionStrings": {
+    "DefaultConnection": ""
+  },
   "MLEndpoint": "<your ML model endpoint",
   "MLKey": "<your ML key>"
 }
