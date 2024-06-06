@@ -64,5 +64,6 @@
   <ItemGroup>
     <Build Include="dbo\Tables\PersonGroup.sql" />
     <Build Include="dbo\Tables\PersonGroupImages.sql" />
+    <Build Include="dbo\Tables\PersonFace.sql" />
   </ItemGroup>
 </Project>

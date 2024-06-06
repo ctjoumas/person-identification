@@ -14,47 +14,37 @@ namespace PersonIdentificationApi.Services
             _connectionString = connectionString;
         }
 
-        public async Task<int> InsertPersonGroupAsync(DbPersonGroup personGroup)
+        public async Task<int> InsertPersonGroupAsync(IDbConnection dbConnection, DbPersonGroup personGroup, IDbTransaction transaction)
         {
-            using IDbConnection db = new SqlConnection(_connectionString);
             string query = @"
-                INSERT INTO PersonGroup (PersonGroupId, IsTrained, IsDeleted, CreatedBy)
-                VALUES (@PersonGroupId, @IsTrained, @IsDeleted, @CreatedBy)";
-            return await db.ExecuteAsync(query, personGroup);
+                INSERT INTO PersonGroup (PersonGroupId, IsTrained)
+                VALUES (@PersonGroupId, @IsTrained)";
+
+            return await dbConnection.ExecuteAsync(query, personGroup, transaction);
         }
 
-        public async Task<int> InsertPersonGroupImageAsync(DbPersonGroupImage personGroupImage)
+        public async Task<int> InsertPersonGroupImageAsync(IDbConnection dbConnection, DbPersonGroupImage personGroupImage, IDbTransaction transaction)
         {
-            using IDbConnection db = new SqlConnection(_connectionString);
             string query = @"
-                INSERT INTO PersonGroupImages (PersonGroupImageId, PersonGroupId, BlobName, BlobUrl, CreatedBy)
-                VALUES (@PersonGroupImageId, @PersonGroupId, @BlobName, @BlobUrl, @CreatedBy)";
-            return await db.ExecuteAsync(query, personGroupImage);
+                INSERT INTO PersonGroupImage (PersonId, PersonGroupId, BlobName, BlobUrl)
+                VALUES (@PersonId, @PersonGroupId, @BlobName, @BlobUrl)";
+
+            return await dbConnection.ExecuteAsync(query, personGroupImage, transaction);
         }
 
-        // Gets all person groups that have been trained.
-        public async Task<List<DbPersonGroupImage>> GetPersonGroupAsync(Guid personGroupId)
+        public async Task<int> InsertPersonFaceAsync(IDbConnection dbConnection, DbPersonFace personFace, IDbTransaction transaction)
         {
-            using IDbConnection db = new SqlConnection(_connectionString);
-
             string query = @"
-                SELECT 
-                pg.[PersonGroupId],
-                pgi.BlobName,
-                pgi.BlobUrl
-                FROM [dbo].[PersonGroup] pg
-                JOIN [dbo].[PersonGroupImages] pgi on pg.PersonGroupId = pgi.PersonGroupId
-                WHERE pg.PersonGroupId = @PersonGroupId";
+                INSERT INTO PersonFace (FaceId, PersonId)
+                VALUES (@FaceId, @PersonId)";
 
-            var personGroupImages = await db.QueryAsync<DbPersonGroupImage>(query);
-
-            return personGroupImages.ToList();
+            return await dbConnection.ExecuteAsync(query, personFace, transaction);
         }
 
         // Gets all person groups that have been trained.
         public async Task<List<DbPersonGroupImage>> GetPersonGroupsAsync()
         {
-            using IDbConnection db = new SqlConnection(_connectionString);
+            using IDbConnection dbConnection = new SqlConnection(_connectionString);
 
             string query = @"
                 SELECT 
@@ -62,10 +52,10 @@ namespace PersonIdentificationApi.Services
                 pgi.BlobName,
                 pgi.BlobUrl
                 FROM [dbo].[PersonGroup] pg
-                JOIN [dbo].[PersonGroupImages] pgi on pg.PersonGroupId = pgi.PersonGroupId
+                JOIN [dbo].[PersonGroupImage] pgi on pg.PersonGroupId = pgi.PersonGroupId
                 WHERE pg.IsTrained = 1";
 
-            var personGroupImages = await db.QueryAsync<DbPersonGroupImage>(query);
+            var personGroupImages = await dbConnection.QueryAsync<DbPersonGroupImage>(query);
 
             return personGroupImages.ToList();
         }
@@ -82,6 +72,41 @@ namespace PersonIdentificationApi.Services
                 WHERE PersonGroupId = @PersonGroupId";
 
             await db.ExecuteAsync(query, new { PersonGroupId = personGroupId });
+        }
+
+        public async Task SavePersonGroupAllAsync(
+            DbPersonGroup dbPersonGroup,
+            List<DbPersonGroupImage> dbPersonGroupImages,
+            List<DbPersonFace> dbPersonFaces)
+        {
+            using (IDbConnection dbConnection = new SqlConnection(_connectionString))
+            {
+                dbConnection.Open();
+                using (IDbTransaction transaction = dbConnection.BeginTransaction())
+                {
+                    try
+                    {
+                        await InsertPersonGroupAsync(dbConnection, dbPersonGroup, transaction);
+
+                        foreach (var dbPersonGroupImage in dbPersonGroupImages)
+                        {
+                            await InsertPersonGroupImageAsync(dbConnection, dbPersonGroupImage, transaction);
+                        }
+
+                        foreach (var dbPersonFace in dbPersonFaces)
+                        {
+                            await InsertPersonFaceAsync(dbConnection, dbPersonFace, transaction);
+                        }
+
+                        transaction.Commit();
+                    }
+                    catch (Exception)
+                    {
+                        transaction.Rollback();
+                        throw;
+                    }
+                }
+            }
         }
     }
 }
