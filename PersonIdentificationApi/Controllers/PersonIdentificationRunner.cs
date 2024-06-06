@@ -49,6 +49,21 @@
         {
             try
             {
+                if (processModel.Images.Count == 0)
+                {
+                    return BadRequest("No images provided for training");
+                }
+
+                if (string.IsNullOrEmpty(processModel.GroupName))
+                {
+                    return BadRequest("No group name provided for training");
+                }
+
+                if (string.IsNullOrEmpty(processModel.Process))
+                {
+                    return BadRequest("No process provided for training");
+                }
+
                 var imagesToTrain = new List<string>();
                 
                 if (processModel.Process.Equals("Training"))
@@ -78,7 +93,7 @@
                 }
 
                 // run the training process
-                var groupId = await _faceService.TrainAsync(imagesToTrain);
+                var groupId = await _faceService.TrainAsync(imagesToTrain, processModel.GroupName);
 
                 return Ok(groupId);
             }

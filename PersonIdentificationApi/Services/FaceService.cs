@@ -117,9 +117,11 @@ namespace PersonIdentification.FaceService
         public async Task DeletePersonGroup(string personGroupId)
         {
             _logger.LogInformation($"Deleting person group: {personGroupId}");
+
             using var faceClient = new FaceClient(new ApiKeyServiceClientCredentials(_faceSettings.SubscriptionKey)) { Endpoint = _faceSettings.EndPoint };
-            await faceClient.PersonGroup.GetAsync(personGroupId);
+
             await faceClient.PersonGroup.DeleteAsync(personGroupId);
+
             _logger.LogInformation($"Deleted person group: {personGroupId}");
         }
 
@@ -133,18 +135,19 @@ namespace PersonIdentification.FaceService
 
         // This is an example of how to train images using Azure AI Face service.
         // Stores the person group and images trained in the database.
-        public async Task<string> TrainAsync(List<string> imageSasUrls)
+        public async Task<string> TrainAsync(List<string> imageSasUrls, string groupName)
         {
             var dbPersonGroup = new DbPersonGroup();
             var personGroupId = Guid.NewGuid().ToString();
             dbPersonGroup.PersonGroupId = Guid.Parse(personGroupId);
+            dbPersonGroup.PersonGroupName = groupName;
 
             _logger.LogInformation($"Create a person group ({personGroupId}).");
 
             using var faceClient = new FaceClient(new ApiKeyServiceClientCredentials(_faceSettings.SubscriptionKey)) { Endpoint = _faceSettings.EndPoint };
 
             // Create a Person Group
-            await faceClient.PersonGroup.CreateAsync(personGroupId, $"Group: {personGroupId}", recognitionModel: RECOGNITION_MODEL4);
+            await faceClient.PersonGroup.CreateAsync(personGroupId, groupName, recognitionModel: RECOGNITION_MODEL4);
 
             bool sufficientQuality;
             var imageName = string.Empty;
