@@ -1,13 +1,15 @@
 ﻿namespace PersonIdentificationApi.Controllers
 {
+    using Microsoft.AspNetCore.DataProtection.KeyManagement;
     using Microsoft.AspNetCore.Mvc;
-    using Microsoft.Azure.CognitiveServices.Vision.Face.Models;
     using Microsoft.Azure.CognitiveServices.Vision.Face;
+    using Microsoft.Azure.CognitiveServices.Vision.Face.Models;
     using Microsoft.Extensions.Options;
     using PersonIdentification.FaceService;
     using PersonIdentificationApi.Helpers;
     using PersonIdentificationApi.Utilities;
     using System.Text.Json;
+    using static System.Net.WebRequestMethods;
 
     [ApiController]
     [Route("[controller]")]
@@ -123,18 +125,18 @@
                         }
                         else
                         {
-                            // TODO
+                            // run the pipeline to include
+                            // - call segmentation API (return list of person objects)
+                            Segmentation segmentation = new Segmentation(processModel.Images[0].Filename, imageUri.AbsoluteUri);
+                            List<string> segmentedImages = await segmentation.RunSegmentation();
+                            // - loop through each person object and
+                            //   - call Face API
+                            //   - call OCR API
+                            var imagesToIdentify = processModel.Images.Select(x => x.Filename).ToList();
+                            var identificationResponse = await _faceService.DetectFaceRecognize(imagesToIdentify);
+                            _logger.LogInformation($"Identification response: {JsonSerializer.Serialize(identificationResponse)}");
                         }
                     }
-
-                    // run the pipeline to include
-                    // - call segmentation API (return list of person objects)
-                    // - loop through each person object and
-                    //   - call Face API for Identification
-                    //   - call OCR API
-                    var imagesToIdentify = processModel.Images.Select(x => x.Filename).ToList();
-                    var identificationResponse =  await _faceService.DetectFaceRecognize(imagesToIdentify);
-                    _logger.LogInformation($"Identification response: {JsonSerializer.Serialize(identificationResponse)}");
                 }
                 else
                 {
