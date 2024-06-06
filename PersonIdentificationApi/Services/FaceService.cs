@@ -139,8 +139,6 @@ namespace PersonIdentification.FaceService
 
             foreach (var sasUrl in imageSasUrls)
             {
-                var dbPersonGroupImage = new DbPersonGroupImage();
-
                 sasUri = new Uri(sasUrl);
                 imageName = Path.GetFileName(sasUri.LocalPath);
 
@@ -168,6 +166,7 @@ namespace PersonIdentification.FaceService
                             {
                                 _logger.LogInformation($"Quality sufficient for recognition for detected face. FaceId: {detectedFace.FaceId} Image: {imageName}");
                                 var person = await faceClient.PersonGroupPerson.CreateAsync(personGroupId, detectedFace.FaceId.ToString());
+                                var dbPersonGroupImage = new DbPersonGroupImage();
                                 dbPersonGroupImage.PersonId = person.PersonId;
 
                                 // Crop the image to only include the detected face
@@ -176,6 +175,13 @@ namespace PersonIdentification.FaceService
 
                                 using var addFaceStream = new MemoryStream(croppedImage);
                                 await faceClient.PersonGroupPerson.AddFaceFromStreamAsync(personGroupId, person.PersonId, addFaceStream, detectedFace.FaceId.ToString());
+
+                                dbPersonGroupImage.PersonGroupId = Guid.Parse(personGroupId);
+                                var blobUrl = sasUri.GetLeftPart(UriPartial.Path);
+                                var blobName = Path.GetFileName(sasUri.LocalPath);
+                                dbPersonGroupImage.BlobName = blobName;
+                                dbPersonGroupImage.BlobUrl = blobUrl;
+                                dbPersonGroupImages.Add(dbPersonGroupImage);
 
                                 dbPersonFaces.Add(new DbPersonFace
                                 {
@@ -201,11 +207,19 @@ namespace PersonIdentification.FaceService
                             {
                                 _logger.LogInformation($"Quality sufficient for recognition for detected face. FaceId: {detectedFace.FaceId} Image: {imageName}");
                                 var person = await faceClient.PersonGroupPerson.CreateAsync(personGroupId, detectedFace.FaceId.ToString());
+                                var dbPersonGroupImage = new DbPersonGroupImage();
                                 dbPersonGroupImage.PersonId = person.PersonId;
 
                                 // No need to crop the image as it contains only one face
                                 using var addFaceStream = new MemoryStream(blobContent);
                                 await faceClient.PersonGroupPerson.AddFaceFromStreamAsync(personGroupId, person.PersonId, addFaceStream, detectedFace.FaceId.ToString());
+
+                                dbPersonGroupImage.PersonGroupId = Guid.Parse(personGroupId);
+                                var blobUrl = sasUri.GetLeftPart(UriPartial.Path);
+                                var blobName = Path.GetFileName(sasUri.LocalPath);
+                                dbPersonGroupImage.BlobName = blobName;
+                                dbPersonGroupImage.BlobUrl = blobUrl;
+                                dbPersonGroupImages.Add(dbPersonGroupImage);
 
                                 dbPersonFaces.Add(new DbPersonFace
                                 {
@@ -219,14 +233,6 @@ namespace PersonIdentification.FaceService
                             }
                         }
                     }
-
-                    dbPersonGroupImage.PersonGroupId = Guid.Parse(personGroupId);
-                    var blobUrl = sasUri.GetLeftPart(UriPartial.Path);
-                    var blobName = Path.GetFileName(sasUri.LocalPath);
-                    dbPersonGroupImage.BlobName = blobName;
-                    dbPersonGroupImage.BlobUrl = blobUrl;
-                    dbPersonGroupImage.CreatedBy = "System"; // TODO: Get the user from the request
-                    dbPersonGroupImages.Add(dbPersonGroupImage);
                 }
             }
 
@@ -328,6 +334,7 @@ namespace PersonIdentification.FaceService
 
                 if (trainingStatus.Status == TrainingStatusType.Succeeded)
                 {
+                    dbPersonGroup.IsTrained = true;
                     await _personGroupRepository.SavePersonGroupAllAsync(dbPersonGroup, dbPersonGroupImages, dbPersonFaces);
                     break;
                 }
