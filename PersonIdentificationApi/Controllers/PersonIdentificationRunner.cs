@@ -163,5 +163,24 @@
                 return StatusCode(500, ex.Message);
             }
         }
+
+        [HttpDelete("deletePersonGroup/{personGroupId}")]
+        public async Task<IActionResult> DeletePersonGroup(string personGroupId)
+        {
+            try
+            {
+                await _faceService.DeletePersonGroup(personGroupId);
+                return Ok();
+            }
+            catch (Exception ex)
+            {
+                if (ex.Message.Contains("NotFound"))
+                {
+                    return NotFound();
+                }
+
+                return StatusCode(500, ex.Message);
+            }
+        }
     }
 }
