@@ -1,4 +1,5 @@
-﻿CREATE TABLE [dbo].[PersonGroupImage] (
+﻿CREATE TABLE [dbo].[PersonGroupImage]
+(
     [PersonId]           UNIQUEIDENTIFIER NOT NULL,
     [PersonGroupId]      UNIQUEIDENTIFIER NOT NULL,
     [BlobName]           VARCHAR (100)    NOT NULL,

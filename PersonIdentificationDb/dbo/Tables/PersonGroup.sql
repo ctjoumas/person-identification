@@ -1,4 +1,5 @@
-﻿CREATE TABLE [dbo].[PersonGroup] (
+﻿CREATE TABLE [dbo].[PersonGroup] 
+(
     [PersonGroupId] UNIQUEIDENTIFIER NOT NULL,
     [IsTrained]     BIT              NULL,
     [IsDeleted]     BIT              NULL,

@@ -34,7 +34,6 @@ namespace PersonIdentification.FaceService
             };
         }
 
-
         // This is an example of identification using Azure AI Face service.
         // Assumes that a set of images have been trained and a person group has been created.
         // Person group and images trained are stored in the database. Images trained are stored in Azure Blob Storage.
