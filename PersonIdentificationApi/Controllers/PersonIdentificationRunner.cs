@@ -142,13 +142,12 @@
                         {
                             // run the pipeline to include
                             // - call segmentation API (return list of person objects)
-                            //Segmentation segmentation = new Segmentation(processModel.Images[0].Filename, imageUri.AbsoluteUri);
-                            //List<string> segmentedImages = await segmentation.RunSegmentation();
+                            Segmentation segmentation = new Segmentation(processModel.Images[0].Filename, imageUri.AbsoluteUri);
+                            List<string> segmentedImages = await segmentation.RunSegmentation();
                             // - loop through each person object and
                             //   - call Face API
                             //   - call OCR API
-                            var imagesToIdentify = processModel.Images.Select(x => x.Filename).ToList();
-                            var identificationResponse = await _faceService.DetectFaceRecognize(imagesToIdentify);
+                            var identificationResponse = await _faceService.DetectFaceRecognize(segmentedImages);
                             _logger.LogInformation($"Identification response: {JsonSerializer.Serialize(identificationResponse)}");
                         }
                     }
