@@ -91,9 +91,10 @@ namespace PersonIdentification.FaceService
 
                                 response.PersonGroupId = dbDetectionResult.PersonGroupId.ToString();
                                 response.PersonId = person.PersonId.ToString();
-                                response.ImageToIdentify = imageToIdentify;
-                                response.BlobName = dbDetectionResult.BlobName;
-                                response.BlobUrl = dbDetectionResult.BlobUrl;
+                                response.SegmentedImageName = imageToIdentify;
+                                response.SegmentedSasBlobUrl = sasUri.ToString();
+                                response.ImageTrained = dbDetectionResult.BlobName;
+                                //response.TrainedBlobUrl = dbDetectionResult.BlobUrl;
 
                                 var faceIdentified = new FacesIdentified
                                 {
@@ -309,14 +310,15 @@ namespace PersonIdentification.FaceService
 
         private static bool IsQualityForRecognition(DetectedFace detectedFace)
         {
+            // TODO: bypassing quality check for now
             bool sufficientQuality = true;
-            var faceQualityForRecognition = detectedFace.FaceAttributes.QualityForRecognition;
+            //var faceQualityForRecognition = detectedFace.FaceAttributes.QualityForRecognition;
 
-            //  Only "high" quality images are recommended for person enrollment
-            if (faceQualityForRecognition.HasValue && (faceQualityForRecognition.Value != QualityForRecognition.High))
-            {
-                sufficientQuality = false;
-            }
+            ////  Only "high" quality images are recommended for person enrollment
+            //if (faceQualityForRecognition.HasValue && (faceQualityForRecognition.Value != QualityForRecognition.High))
+            //{
+            //    sufficientQuality = false;
+            //}
 
             return sufficientQuality;
         }
