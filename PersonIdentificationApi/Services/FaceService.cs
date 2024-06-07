@@ -42,14 +42,14 @@ namespace PersonIdentification.FaceService
             var detectedFaceResponse = new List<DetectedFaceResponse>();
 
             // Get all trained groups for lookup
-            var personGroupImages = await _personGroupRepository.GetPersonGroupsAsync();
+            var dbDetectionResults = await _personGroupRepository.GetPersonGroupsAsync();
             var faceClient = new FaceClient(new ApiKeyServiceClientCredentials(_faceSettings.SubscriptionKey)) { Endpoint = _faceSettings.EndPoint };
 
             // Loop through all passed in images that need to be identified
             // Get all trained groups for lookup
             foreach (var imageToIdentify in imagesToIdentify)
             {
-                foreach (var personGroupImage in personGroupImages)
+                foreach (var dbDetectionResult in dbDetectionResults)
                 {
                     var sourceFaceIds = new List<Guid>();
 
@@ -62,7 +62,7 @@ namespace PersonIdentification.FaceService
                     foreach (var detectedFace in detectedFaces) { sourceFaceIds.Add(detectedFace.FaceId.Value); }
 
                     // Identify the faces in a person group. 
-                    var identifyResults = await faceClient.Face.IdentifyAsync(sourceFaceIds, personGroupImage.PersonGroupId.ToString());
+                    var identifyResults = await faceClient.Face.IdentifyAsync(sourceFaceIds, dbDetectionResult.PersonGroupId.ToString());
 
                     foreach (IdentifyResult? identifyResult in identifyResults)
                     {
@@ -78,21 +78,22 @@ namespace PersonIdentification.FaceService
 
                         foreach (var candidate in identifyResult.Candidates)
                         {
-                            var person = await faceClient.PersonGroupPerson.GetAsync(personGroupImage.PersonGroupId.ToString(), candidate.PersonId);
+                            var person = await faceClient.PersonGroupPerson.GetAsync(dbDetectionResult.PersonGroupId.ToString(), candidate.PersonId);
 
                             if (person != null)
                             {
                                 var response = new DetectedFaceResponse();
+                                response.PersonGroupName = dbDetectionResult.PersonGroupName;
 
                                 _logger.LogInformation($"Person '{person.Name}' is identified for the face in: {imageToIdentify} - {identifyResult.FaceId}, confidence: {candidate.Confidence}.");
 
-                                var verifyResult = await faceClient.Face.VerifyFaceToPersonAsync(identifyResult.FaceId, person.PersonId, personGroupImage.PersonGroupId.ToString());
+                                var verifyResult = await faceClient.Face.VerifyFaceToPersonAsync(identifyResult.FaceId, person.PersonId, dbDetectionResult.PersonGroupId.ToString());
 
-                                response.PersonGroupId = personGroupImage.PersonGroupId.ToString();
+                                response.PersonGroupId = dbDetectionResult.PersonGroupId.ToString();
                                 response.PersonId = person.PersonId.ToString();
                                 response.ImageToIdentify = imageToIdentify;
-                                response.BlobName = personGroupImage.BlobName;
-                                response.BlobUrl = personGroupImage.BlobUrl;
+                                response.BlobName = dbDetectionResult.BlobName;
+                                response.BlobUrl = dbDetectionResult.BlobUrl;
 
                                 var faceIdentified = new FacesIdentified
                                 {
