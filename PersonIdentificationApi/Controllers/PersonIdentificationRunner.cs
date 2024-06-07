@@ -121,6 +121,7 @@
         [ProducesResponseType(500)]
         public async Task<ActionResult> IdentificationRunner([FromBody] ProcessModel processModel)
         {
+            List<Models.DetectedFaceResponse> identificationResponse = new List<Models.DetectedFaceResponse>();
             try
             {               
                 if (processModel.Process.Equals("Identification"))
@@ -147,7 +148,7 @@
                             // - loop through each person object and
                             //   - call Face API
                             //   - call OCR API
-                            var identificationResponse = await _faceService.DetectFaceRecognize(segmentedImages);
+                            identificationResponse = await _faceService.DetectFaceRecognize(segmentedImages);
                             _logger.LogInformation($"Identification response: {JsonSerializer.Serialize(identificationResponse)}");
                         }
                     }
@@ -158,7 +159,7 @@
                 }
 
                 // TODO: Need to return an aggregate response of the identification process.
-                return Ok("Long-running process started in the background");
+                return Ok(identificationResponse);
             }
             catch (Exception ex)
             {
