@@ -5,6 +5,7 @@ namespace PersonIdentificationApi.Models
     public class DetectedFaceResponse
     {
         public string PersonGroupId { get; set; }
+        public string PersonGroupName { get; set; }
         public string ImageToIdentify { get; set; }
         public string BlobName { get; set; }
         public string BlobUrl { get; set; }

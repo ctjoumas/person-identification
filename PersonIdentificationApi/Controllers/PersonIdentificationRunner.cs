@@ -142,8 +142,8 @@
                         {
                             // run the pipeline to include
                             // - call segmentation API (return list of person objects)
-                            Segmentation segmentation = new Segmentation(processModel.Images[0].Filename, imageUri.AbsoluteUri);
-                            List<string> segmentedImages = await segmentation.RunSegmentation();
+                            //Segmentation segmentation = new Segmentation(processModel.Images[0].Filename, imageUri.AbsoluteUri);
+                            //List<string> segmentedImages = await segmentation.RunSegmentation();
                             // - loop through each person object and
                             //   - call Face API
                             //   - call OCR API

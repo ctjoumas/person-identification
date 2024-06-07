@@ -42,20 +42,21 @@ namespace PersonIdentificationApi.Services
         }
 
         // Gets all person groups that have been trained.
-        public async Task<List<DbPersonGroupImage>> GetPersonGroupsAsync()
+        public async Task<List<DbDetectionResult>> GetPersonGroupsAsync()
         {
             using IDbConnection dbConnection = new SqlConnection(_connectionString);
 
             string query = @"
                 SELECT 
                 pg.[PersonGroupId],
+                pg.[PersonGroupName],
                 pgi.BlobName,
                 pgi.BlobUrl
                 FROM [dbo].[PersonGroup] pg
                 JOIN [dbo].[PersonGroupImage] pgi on pg.PersonGroupId = pgi.PersonGroupId
                 WHERE pg.IsTrained = 1";
 
-            var personGroupImages = await dbConnection.QueryAsync<DbPersonGroupImage>(query);
+            var personGroupImages = await dbConnection.QueryAsync<DbDetectionResult>(query);
 
             return personGroupImages.ToList();
         }
