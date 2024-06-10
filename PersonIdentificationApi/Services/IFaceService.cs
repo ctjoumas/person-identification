@@ -1,7 +1,7 @@
 ﻿using Microsoft.Azure.CognitiveServices.Vision.Face.Models;
 using PersonIdentificationApi.Models;
 
-namespace PersonIdentification.FaceService
+namespace PersonIdentificationApi.Services
 {
     public interface IFaceService
     {

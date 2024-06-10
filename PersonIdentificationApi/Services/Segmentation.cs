@@ -1,44 +1,54 @@
-﻿namespace PersonIdentificationApi.Utilities
+﻿using PersonIdentificationApi.Models;
+using System.Net.Http.Headers;
+using System.Text.Json;
+using SixLabors.ImageSharp;
+using SixLabors.ImageSharp.PixelFormats;
+using SixLabors.ImageSharp.Processing;
+using SixLabors.ImageSharp.Formats.Png;
+
+namespace PersonIdentificationApi.Services
 {
-    using Microsoft.AspNetCore.Authentication;
-    using PersonIdentificationApi.Helpers;
-    using PersonIdentificationApi.Models;
-    using System.Net;
-    using System.Net.Http.Headers;
-    using System.Text.Json;
-    using SixLabors.ImageSharp;
-    using SixLabors.Shapes;
-    using SixLabors.ImageSharp.Drawing;
-    using SixLabors.ImageSharp.PixelFormats;
-    using SixLabors.ImageSharp.Processing;
-    using SixLabors.ImageSharp.Formats.Jpeg;
-    using SixLabors.ImageSharp.Drawing.Processing;
-    using System.IO;
-    using SixLabors.ImageSharp.Formats.Png;
-    using System.Collections;
-    using Azure.Storage.Blobs;
-
-    public class Segmentation
+    public class Segmentation : ISegmentation
     {
-        private string _fileName = "";
-        private string _imageUrl = "";
+        private readonly ILogger<Segmentation> _logger;
+        private readonly IConfiguration _configuration;
+        private readonly BlobUtility _blobUtility;
+        private readonly string _mlKey;
+        private readonly string _mlEndpoint;
 
-        public Segmentation(string fileName, string imageUrl)
+        public Segmentation(ILogger<Segmentation> logger, IConfiguration configuration)
         {
-            _fileName = fileName;
-            _imageUrl = imageUrl;
+            _logger = logger;
+
+            _configuration = configuration;
+
+            _blobUtility = new BlobUtility
+            {
+                ConnectionString = _configuration.GetValue<string>("BlobConnectionString"),
+                ContainerName = _configuration.GetValue<string>("ContainerName")
+            };
+
+            if (string.IsNullOrWhiteSpace(_blobUtility.ConnectionString) || string.IsNullOrWhiteSpace(_blobUtility.ContainerName))
+            {
+                throw new Exception("BlobConnectionString and ContainerName are required.");
+            }
+
+            _mlKey = _configuration.GetValue<string>("MLKey");
+            _mlEndpoint = _configuration.GetValue<string>("MLEndpoint");
+
+            if (string.IsNullOrEmpty(_mlKey) || string.IsNullOrWhiteSpace(_mlEndpoint))
+            {
+                throw new Exception("A key and endpoint should be provided to invoke the Azure Machine Learning Model.");
+            }
         }
 
-        public async Task<List<string>> RunSegmentation()
+        public async Task<List<string>> RunSegmentation(string fileName, string imageUrl)
         {
             List<string> segmentImages = new List<string>();
 
             // gets the byte array of the segment / image
-            BlobUtility blobUtility = new BlobUtility();
-            blobUtility.ConnectionString = Helper.GetEnvironmentVariable("BlobConnectionString");
-            blobUtility.ContainerName = Helper.GetEnvironmentVariable("ContainerName");
 
-            byte[] imageByteStream = blobUtility.DownloadBlobStreamAsync(_imageUrl).Result;
+            byte[] imageByteStream = _blobUtility.DownloadBlobStreamAsync(imageUrl).Result;
 
             if (imageByteStream != null)
             {
@@ -104,9 +114,9 @@
 
                                 // upload this segment to the storage account container and save the name to the list so it
                                 // can be later passed to the face identification service
-                                int lastDotIndex = _fileName.LastIndexOf('.');
-                                string segmentFileName = _fileName.Insert(lastDotIndex, $"_{segmentNumber}");
-                                await blobUtility.UploadFromStreamAsync(polygonStream, segmentFileName);
+                                int lastDotIndex = fileName.LastIndexOf('.');
+                                string segmentFileName = fileName.Insert(lastDotIndex, $"_{segmentNumber}");
+                                await _blobUtility.UploadFromStreamAsync(polygonStream, segmentFileName);
 
                                 segmentImages.Add(segmentFileName);
 
@@ -118,27 +128,27 @@
                                 //image.Save(outStream, new JpegEncoder());
                             }
 
-                            Console.WriteLine(box.Label);
-                            Console.WriteLine(box.Score);
-                            Console.WriteLine(box.Box);
-                            Console.WriteLine(box.Polygon);
+                            _logger.LogInformation(box.Label);
+                            _logger.LogInformation(box.Score.ToString());
+                            _logger.LogInformation(box.Box.ToString());
+                            _logger.LogInformation(box.Polygon.ToString());
 
                             segmentNumber++;
                         }
                     }
 
-                    Console.WriteLine("Result: {0}", result);
+                    _logger.LogInformation("Result: {0}", result);
                 }
                 else
                 {
-                    Console.WriteLine(string.Format("The request failed with status code: {0}", response.StatusCode));
+                    _logger.LogInformation(string.Format("The request failed with status code: {0}", response.StatusCode));
 
                     // Print the headers - they include the requert ID and the timestamp,
                     // which are useful for debugging the failure
-                    Console.WriteLine(response.Headers.ToString());
+                    _logger.LogInformation(response.Headers.ToString());
 
                     string responseContent = await response.Content.ReadAsStringAsync();
-                    Console.WriteLine(responseContent);
+                    _logger.LogInformation(responseContent);
                 }
             }
 
@@ -161,6 +171,7 @@
                 ServerCertificateCustomValidationCallback =
                         (httpRequestMessage, cert, cetChain, policyErrors) => { return true; }
             };
+
             using (var client = new HttpClient(handler))
             {
                 // create the request payload for the ML Model
@@ -176,13 +187,9 @@
                 }";
 
                 // Replace this with the primary/secondary key, AMLToken, or Microsoft Entra ID token for the endpoint
-                string apiKey = Helper.GetEnvironmentVariable("MLKey");
-                if (string.IsNullOrEmpty(apiKey))
-                {
-                    throw new Exception("A key should be provided to invoke the endpoint");
-                }
-                client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
-                client.BaseAddress = new Uri("https://object-segmentation.eastus.inference.ml.azure.com/score");
+                client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", _mlKey);
+
+                client.BaseAddress = new Uri(_mlEndpoint);
 
                 var content = new StringContent(requestBody);
                 content.Headers.ContentType = new MediaTypeHeaderValue("application/json");
@@ -199,7 +206,7 @@
                 //      result = await DoSomeTask()
                 // with the following:
                 //      result = await DoSomeTask().ConfigureAwait(false)
-                response = await client.PostAsync(Helper.GetEnvironmentVariable("MLEndpoint"), content);
+                response = await client.PostAsync(_mlEndpoint, content);
             }
 
             return response;

@@ -1,37 +1,50 @@
 ﻿using Microsoft.Azure.CognitiveServices.Vision.Face;
 using Microsoft.Azure.CognitiveServices.Vision.Face.Models;
 using Microsoft.Extensions.Options;
-using PersonIdentificationApi.Helpers;
 using PersonIdentificationApi.Models;
 using PersonIdentificationApi.Services;
-using PersonIdentificationApi.Utilities;
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.Processing;
 
-namespace PersonIdentification.FaceService
+namespace PersonIdentificationApi.Services
 {
     public class FaceService : IFaceService
     {
-        private readonly FaceSettings _faceSettings;
         const string RECOGNITION_MODEL4 = RecognitionModel.Recognition04;
         private readonly ILogger<FaceService> _logger;
         private readonly PersonGroupRepository _personGroupRepository;
         private readonly BlobUtility _blobUtility;
+        private readonly IConfiguration _configuration;
+        private readonly string _faceSubscriptionKey;
+        private readonly string _faceEndPoint;
 
         public FaceService(
-            IOptions<FaceSettings> faceSettings,
             ILogger<FaceService> logger,
-            PersonGroupRepository personGroupRepository)
+            PersonGroupRepository personGroupRepository,
+            IConfiguration configuration)
         {
-            _faceSettings = faceSettings.Value;
+            _configuration = configuration;
+            _faceSubscriptionKey = configuration.GetValue<string>("FaceSubscriptionKey");
+            _faceEndPoint = configuration.GetValue<string>("FaceEndPoint");
+
+            if (string.IsNullOrWhiteSpace(_faceSubscriptionKey) || string.IsNullOrWhiteSpace(_faceEndPoint))
+            {
+                throw new Exception("FaceEndPoint and FaceSubscriptionKey must be set in the appsettings.json file.");
+            }
+
             _logger = logger;
             _personGroupRepository = personGroupRepository;
 
             _blobUtility = new BlobUtility
             {
-                ConnectionString = Helper.GetEnvironmentVariable("BlobConnectionString"),
-                ContainerName = Helper.GetEnvironmentVariable("ContainerName")
+                ConnectionString = _configuration.GetValue<string>("BlobConnectionString"),
+                ContainerName = _configuration.GetValue<string>("ContainerName")
             };
+
+            if (string.IsNullOrWhiteSpace(_blobUtility.ConnectionString) || string.IsNullOrWhiteSpace(_blobUtility.ContainerName))
+            {
+                throw new Exception("BlobConnectionString and ContainerName are required.");
+            }
         }
 
         // This is an example of identification using Azure AI Face service.
@@ -43,7 +56,7 @@ namespace PersonIdentification.FaceService
 
             // Get all trained groups for lookup
             var dbDetectionResults = await _personGroupRepository.GetPersonGroupsAsync();
-            var faceClient = new FaceClient(new ApiKeyServiceClientCredentials(_faceSettings.SubscriptionKey)) { Endpoint = _faceSettings.EndPoint };
+            using var faceClient = new FaceClient(new ApiKeyServiceClientCredentials(_faceSubscriptionKey)) { Endpoint = _faceEndPoint };
 
             // Loop through all passed in images that need to be identified
             // Get all trained groups for lookup
@@ -93,7 +106,7 @@ namespace PersonIdentification.FaceService
                                 response.PersonId = person.PersonId.ToString();
                                 response.SegmentedImageName = imageToIdentify;
                                 response.SegmentedSasBlobUrl = sasUri.ToString();
-                                response.ImageTrained = dbDetectionResult.BlobName;
+                                //response.ImageTrained = dbDetectionResult.BlobName;
                                 //response.TrainedBlobUrl = dbDetectionResult.BlobUrl;
 
                                 var faceIdentified = new FacesIdentified
@@ -120,7 +133,7 @@ namespace PersonIdentification.FaceService
         {
             _logger.LogInformation($"Deleting person group: {personGroupId}");
 
-            using var faceClient = new FaceClient(new ApiKeyServiceClientCredentials(_faceSettings.SubscriptionKey)) { Endpoint = _faceSettings.EndPoint };
+            using var faceClient = new FaceClient(new ApiKeyServiceClientCredentials(_faceSubscriptionKey)) { Endpoint = _faceEndPoint };
 
             await faceClient.PersonGroup.DeleteAsync(personGroupId);
 
@@ -129,7 +142,7 @@ namespace PersonIdentification.FaceService
 
         public async Task<PersonGroup> GetPersonGroup(string personGroupId)
         {
-            using var faceClient = new FaceClient(new ApiKeyServiceClientCredentials(_faceSettings.SubscriptionKey)) { Endpoint = _faceSettings.EndPoint };
+            using var faceClient = new FaceClient(new ApiKeyServiceClientCredentials(_faceSubscriptionKey)) { Endpoint = _faceEndPoint };
             var personGroup = await faceClient.PersonGroup.GetAsync(personGroupId);
 
             return personGroup;
@@ -146,7 +159,7 @@ namespace PersonIdentification.FaceService
 
             _logger.LogInformation($"Create a person group ({personGroupId}).");
 
-            using var faceClient = new FaceClient(new ApiKeyServiceClientCredentials(_faceSettings.SubscriptionKey)) { Endpoint = _faceSettings.EndPoint };
+            using var faceClient = new FaceClient(new ApiKeyServiceClientCredentials(_faceSubscriptionKey)) { Endpoint = _faceEndPoint };
 
             // Create a Person Group
             await faceClient.PersonGroup.CreateAsync(personGroupId, groupName, recognitionModel: RECOGNITION_MODEL4);
@@ -254,7 +267,7 @@ namespace PersonIdentification.FaceService
                                 }
                                 catch (Exception e)
                                 {
-                                    Console.WriteLine(e.ToString());
+                                    _logger.LogWarning($"Error adding face to person group: {e.Message}");
                                 }
                             }
                             else
@@ -274,7 +287,7 @@ namespace PersonIdentification.FaceService
 
         public async Task<string> GetTrainingStatusAsync(string personGroupId)
         {
-            using var faceClient = new FaceClient(new ApiKeyServiceClientCredentials(_faceSettings.SubscriptionKey)) { Endpoint = _faceSettings.EndPoint };
+            using var faceClient = new FaceClient(new ApiKeyServiceClientCredentials(_faceSubscriptionKey)) { Endpoint = _faceEndPoint };
 
             var trainingStatus = await faceClient.PersonGroup.GetTrainingStatusAsync(personGroupId);
 
