@@ -5,7 +5,7 @@ namespace PersonIdentificationApi.Services
 {
     public interface IFaceService
     {
-        Task<string> TrainAsync(List<string> imagesToTrain, string groupName);
+        Task<string> TrainAsync(List<string> imageSasUrls, string groupName, string personName);
         Task<string> GetTrainingStatusAsync(string personGroupId);
         Task<List<DetectedFaceResponse>> DetectFaceRecognize(List<string> imagesToIdentify);
         Task DeletePersonGroup(string personGroupId);
