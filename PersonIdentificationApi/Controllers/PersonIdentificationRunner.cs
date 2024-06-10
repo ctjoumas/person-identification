@@ -1,15 +1,9 @@
 ﻿namespace PersonIdentificationApi.Controllers
 {
-    using Microsoft.AspNetCore.DataProtection.KeyManagement;
     using Microsoft.AspNetCore.Mvc;
-    using Microsoft.Azure.CognitiveServices.Vision.Face;
-    using Microsoft.Azure.CognitiveServices.Vision.Face.Models;
-    using Microsoft.Extensions.Options;
-    using PersonIdentification.FaceService;
-    using PersonIdentificationApi.Helpers;
-    using PersonIdentificationApi.Utilities;
+    using PersonIdentificationApi.Models;
+    using PersonIdentificationApi.Services;
     using System.Text.Json;
-    using static System.Net.WebRequestMethods;
 
     [ApiController]
     [Route("[controller]")]
@@ -17,13 +11,26 @@
     {
         private readonly IFaceService _faceService;
         private readonly ILogger<PersonIdentificationRunner> _logger;
-        private readonly FaceSettings _faceSettings;
+        private readonly IConfiguration _configuration;
+        private readonly BlobUtility _blobUtility;
+        private readonly ISegmentation _segmentation;
 
-        public PersonIdentificationRunner(IFaceService faceService, ILogger<PersonIdentificationRunner> logger, IOptions<FaceSettings> faceSettings)
+        public PersonIdentificationRunner(
+            IFaceService faceService,
+            ISegmentation segmentation,
+            ILogger<PersonIdentificationRunner> logger, 
+            IConfiguration configuration)
         {
             _faceService = faceService;
+            _segmentation = segmentation;
             _logger = logger;
-            _faceSettings = faceSettings.Value;
+            _configuration = configuration;
+
+            _blobUtility = new BlobUtility
+            {
+                ConnectionString = _configuration.GetValue<string>("BlobConnectionString"),
+                ContainerName = _configuration.GetValue<string>("ContainerName")
+            };
         }
 
         /// <summary>
@@ -68,14 +75,10 @@
                 
                 if (processModel.Process.Equals("Training"))
                 {
-                    BlobUtility blobUtility = new BlobUtility();
-                    blobUtility.ConnectionString = Helper.GetEnvironmentVariable("BlobConnectionString");
-                    blobUtility.ContainerName = Helper.GetEnvironmentVariable("ContainerName");
-
                     // get the URI of each image in the container
                     foreach (Image image in processModel.Images)
                     {
-                        Uri imageUri = blobUtility.GetBlobSasUri(image.Filename);
+                        Uri imageUri = _blobUtility.GetBlobSasUri(image.Filename);
 
                         if (imageUri == null)
                         {
@@ -126,14 +129,10 @@
             {               
                 if (processModel.Process.Equals("Identification"))
                 {
-                    BlobUtility blobUtility = new BlobUtility();
-                    blobUtility.ConnectionString = Helper.GetEnvironmentVariable("BlobConnectionString");
-                    blobUtility.ContainerName = Helper.GetEnvironmentVariable("ContainerName");
-
                     // get the URI of each image in the container
                     foreach (Image image in processModel.Images)
                     {
-                        Uri imageUri = blobUtility.GetBlobSasUri(image.Filename);
+                        Uri imageUri = _blobUtility.GetBlobSasUri(image.Filename);
 
                         if (imageUri == null)
                         {
@@ -143,8 +142,7 @@
                         {
                             // run the pipeline to include
                             // - call segmentation API (return list of person objects)
-                            Segmentation segmentation = new Segmentation(processModel.Images[0].Filename, imageUri.AbsoluteUri);
-                            List<string> segmentedImages = await segmentation.RunSegmentation();
+                            List<string> segmentedImages = await _segmentation.RunSegmentation(processModel.Images[0].Filename, imageUri.AbsoluteUri);
                             // - loop through each person object and
                             //   - call Face API
                             //   - call OCR API

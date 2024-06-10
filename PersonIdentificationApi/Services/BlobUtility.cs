@@ -1,4 +1,4 @@
-﻿namespace PersonIdentificationApi.Utilities
+﻿namespace PersonIdentificationApi.Services
 {
     using Azure.Storage.Blobs;
     using Azure.Storage.Sas;
