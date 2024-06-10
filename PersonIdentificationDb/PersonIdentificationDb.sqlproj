@@ -63,7 +63,7 @@
   </ItemGroup>
   <ItemGroup>
     <Build Include="dbo\Tables\PersonGroup.sql" />
-    <Build Include="dbo\Tables\PersonGroupImages.sql" />
-    <Build Include="dbo\Tables\PersonFace.sql" />
+    <Build Include="dbo\Tables\PersonGroupPerson.sql" />
+    <Build Include="dbo\Tables\PersonGroupPersonFace.sql" />
   </ItemGroup>
 </Project>

@@ -8,6 +8,7 @@ namespace PersonIdentificationApi.Models
         public string PersonGroupId { get; set; }
         public string PersonId { get; internal set; }
         public string PersonGroupName { get; set; }
+        public string PersonName { get; set; }
         [JsonIgnore]
         public string ImageTrained { get; set; }
         [JsonIgnore]
