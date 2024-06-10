@@ -233,20 +233,29 @@ namespace PersonIdentification.FaceService
 
                                 // No need to crop the image as it contains only one face
                                 using var addFaceStream = new MemoryStream(blobContent);
-                                await faceClient.PersonGroupPerson.AddFaceFromStreamAsync(personGroupId, person.PersonId, addFaceStream, detectedFace.FaceId.ToString());
 
-                                dbPersonGroupImage.PersonGroupId = Guid.Parse(personGroupId);
-                                var blobUrl = sasUri.GetLeftPart(UriPartial.Path);
-                                var blobName = Path.GetFileName(sasUri.LocalPath);
-                                dbPersonGroupImage.BlobName = blobName;
-                                dbPersonGroupImage.BlobUrl = blobUrl;
-                                dbPersonGroupImages.Add(dbPersonGroupImage);
-
-                                dbPersonFaces.Add(new DbPersonFace
+                                // handling event where a face is not detected to prevent the app from crashing
+                                try
                                 {
-                                    FaceId = detectedFace.FaceId.Value,
-                                    PersonId = person.PersonId
-                                });
+                                    await faceClient.PersonGroupPerson.AddFaceFromStreamAsync(personGroupId, person.PersonId, addFaceStream, detectedFace.FaceId.ToString());
+
+                                    dbPersonGroupImage.PersonGroupId = Guid.Parse(personGroupId);
+                                    var blobUrl = sasUri.GetLeftPart(UriPartial.Path);
+                                    var blobName = Path.GetFileName(sasUri.LocalPath);
+                                    dbPersonGroupImage.BlobName = blobName;
+                                    dbPersonGroupImage.BlobUrl = blobUrl;
+                                    dbPersonGroupImages.Add(dbPersonGroupImage);
+
+                                    dbPersonFaces.Add(new DbPersonFace
+                                    {
+                                        FaceId = detectedFace.FaceId.Value,
+                                        PersonId = person.PersonId
+                                    });
+                                }
+                                catch (Exception e)
+                                {
+                                    Console.WriteLine(e.ToString());
+                                }
                             }
                             else
                             {
