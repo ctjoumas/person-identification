@@ -363,3 +363,4 @@ MigrationBackup/
 FodyWeavers.xsd
 /PersonIdentificationApi/local.settings.json
 /PersonIdentificationApi/local.settings.json
+/PersonIdentificationApi/appsettings.Development.json
