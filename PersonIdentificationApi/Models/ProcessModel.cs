@@ -7,6 +7,9 @@
         [JsonProperty("personGroupName")]
         public string PersonGroupName { get; set; }
 
+        [JsonProperty("personGroupId")]
+        public string? PersonGroupId { get; set; }
+
         [JsonProperty("processModel")]
         public ProcessTrainingModel ProcessTrainingModel { get; set; }
     }

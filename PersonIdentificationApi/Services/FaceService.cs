@@ -147,16 +147,16 @@ namespace PersonIdentificationApi.Services
 
         // This is an example of how to train images using Azure AI Face service.
         // Stores the person group and images trained in the database.
-        public async Task<string> TrainAsync(List<string> imageSasUrls, string groupName, string personName)
+        public async Task<string> TrainNewGroupAsync(List<string> imageSasUrls, string groupName, string personName)
         {
             var dbPersonGroup = new DbPersonGroup();
             var personGroupId = Guid.NewGuid().ToString();
             dbPersonGroup.PersonGroupId = Guid.Parse(personGroupId);
             dbPersonGroup.PersonGroupName = groupName;
 
-            _logger.LogInformation($"Create a person group ({personGroupId}).");
-
             using var faceClient = new FaceClient(new ApiKeyServiceClientCredentials(_faceSubscriptionKey)) { Endpoint = _faceEndPoint };
+
+            _logger.LogInformation($"Create a person group ({personGroupId}).");
 
             // Create a Person Group
             await faceClient.PersonGroup.CreateAsync(personGroupId, groupName, recognitionModel: RECOGNITION_MODEL4);
@@ -176,14 +176,7 @@ namespace PersonIdentificationApi.Services
                 // Download the blob's contents to a memory stream
                 byte[] blobContent = await _blobUtility.DownloadBlobStreamAsync(sasUrl);
 
-                IList<DetectedFace> detectedFaces;
-                using (var detectionStream = new MemoryStream(blobContent))
-                {
-                    detectedFaces = await faceClient.Face.DetectWithStreamAsync(detectionStream,
-                        recognitionModel: RECOGNITION_MODEL4,
-                        detectionModel: DetectionModel.Detection03,
-                        returnFaceAttributes: new List<FaceAttributeType> { FaceAttributeType.QualityForRecognition });
-                }
+                IList<DetectedFace> detectedFaces = await GetDetectedFaces(faceClient, blobContent);
 
                 if (detectedFaces.Any())
                 {
@@ -219,7 +212,8 @@ namespace PersonIdentificationApi.Services
                                     FaceId = detectedFace.FaceId.Value,
                                     PersonId = person.PersonId,
                                     BlobName = blobName,
-                                    BlobUrl = blobUrl
+                                    BlobUrl = blobUrl,
+                                    IsTrained = true
                                 });
                             }
                             else
@@ -231,7 +225,7 @@ namespace PersonIdentificationApi.Services
                     else
                     {
                         var detectedFace = detectedFaces.FirstOrDefault();
-
+                        
                         if (detectedFace != null) // this seems unlikely to be null, but just in case
                         {
                             sufficientQuality = IsQualityForRecognition(detectedFace);
@@ -240,6 +234,7 @@ namespace PersonIdentificationApi.Services
                             {
                                 _logger.LogInformation($"Quality sufficient for recognition for detected face. FaceId: {detectedFace.FaceId} Image: {imageName}");
                                 var person = await faceClient.PersonGroupPerson.CreateAsync(personGroupId, personName);
+                                
                                 var dbPersonGroupPerson = new DbPersonGroupPerson();
                                 dbPersonGroupPerson.PersonId = person.PersonId;
                                 dbPersonGroupPerson.PersonName = personName;
@@ -262,7 +257,8 @@ namespace PersonIdentificationApi.Services
                                         FaceId = detectedFace.FaceId.Value,
                                         PersonId = person.PersonId,
                                         BlobName = blobName,
-                                        BlobUrl = blobUrl
+                                        BlobUrl = blobUrl,
+                                        IsTrained = true
                                     });
                                 }
                                 catch (Exception e)
@@ -280,9 +276,125 @@ namespace PersonIdentificationApi.Services
             }
 
             // TODO: This should be done in a background process
-            await TrainAndCheckStatusAsync(personGroupId,faceClient,dbPersonGroup, dbPersonGroupPeople, dbPersonFaces);
+            await TrainAndCheckStatusAsync(personGroupId, faceClient, dbPersonGroup, dbPersonGroupPeople, dbPersonFaces);
 
             return personGroupId;
+        }
+
+        public async Task TrainExistingGroup(List<string> imageSasUrls, string personGroupId, string personName)
+        {
+            var existingPersonGroup = await _personGroupRepository.GetPersonGroupAsync(personGroupId, personName);
+
+            if (existingPersonGroup != null)
+            {
+                using var faceClient = new FaceClient(new ApiKeyServiceClientCredentials(_faceSubscriptionKey)) { Endpoint = _faceEndPoint };
+                bool sufficientQuality;
+                var imageName = string.Empty;
+                Uri? sasUri = null;
+                var dbPersonFaces = new List<DbPersonGroupPersonFace>();
+
+                foreach (var sasUrl in imageSasUrls)
+                {
+                    sasUri = new Uri(sasUrl);
+                    imageName = Path.GetFileName(sasUri.LocalPath);
+
+                    // Download the blob's contents to a memory stream
+                    byte[] blobContent = await _blobUtility.DownloadBlobStreamAsync(sasUrl);
+
+                    IList<DetectedFace> detectedFaces = await GetDetectedFaces(faceClient, blobContent);
+
+                    if (detectedFaces.Any())
+                    {
+                        if (detectedFaces.Count > 1)
+                        {
+                            foreach (var detectedFace in detectedFaces)
+                            {
+                                sufficientQuality = IsQualityForRecognition(detectedFace);
+
+                                if (sufficientQuality)
+                                {
+                                    _logger.LogInformation($"Quality sufficient for recognition for detected face. FaceId: {detectedFace.FaceId} Image: {imageName}");
+                                    var person = await faceClient.PersonGroupPerson.GetAsync(personGroupId.ToString(), existingPersonGroup.PersonId);
+
+                                    // Crop the image to only include the detected face
+                                    var faceRectangle = detectedFace.FaceRectangle;
+                                    var croppedImage = CropImage(blobContent, faceRectangle);
+
+                                    using var addFaceStream = new MemoryStream(croppedImage);
+                                    await faceClient.PersonGroupPerson.AddFaceFromStreamAsync(personGroupId.ToString(), person.PersonId, addFaceStream, detectedFace.FaceId.ToString());
+                                    
+                                    var blobUrl = sasUri.GetLeftPart(UriPartial.Path);
+                                    var blobName = Path.GetFileName(sasUri.LocalPath);
+
+                                    dbPersonFaces.Add(new DbPersonGroupPersonFace
+                                    {
+                                        FaceId = detectedFace.FaceId.Value,
+                                        PersonId = person.PersonId,
+                                        BlobName = blobName,
+                                        BlobUrl = blobUrl,
+                                        IsTrained = true
+                                    });
+                                }
+                                else
+                                {
+                                    _logger.LogInformation($"Insuffucient quality for recognition for detected face. FaceId: {detectedFace.FaceId} Image: {imageName}");
+                                }
+                            }
+                        }
+                        else
+                        {
+                            var detectedFace = detectedFaces.FirstOrDefault();
+
+                            if (detectedFace != null) // this seems unlikely to be null, but just in case
+                            {
+                                sufficientQuality = IsQualityForRecognition(detectedFace);
+
+                                if (sufficientQuality)
+                                {
+                                    _logger.LogInformation($"Quality sufficient for recognition for detected face. FaceId: {detectedFace.FaceId} Image: {imageName}");
+                                    var person = await faceClient.PersonGroupPerson.GetAsync(personGroupId.ToString(), existingPersonGroup.PersonId);
+
+                                    // No need to crop the image as it contains only one face
+                                    using var addFaceStream = new MemoryStream(blobContent);
+
+                                    // handling event where a face is not detected to prevent the app from crashing
+                                    try
+                                    {
+                                        await faceClient.PersonGroupPerson.AddFaceFromStreamAsync(personGroupId.ToString(), person.PersonId, addFaceStream, detectedFace.FaceId.ToString());
+
+                                        var blobUrl = sasUri.GetLeftPart(UriPartial.Path);
+                                        var blobName = Path.GetFileName(sasUri.LocalPath);
+
+                                        dbPersonFaces.Add(new DbPersonGroupPersonFace
+                                        {
+                                            FaceId = detectedFace.FaceId.Value,
+                                            PersonId = person.PersonId,
+                                            BlobName = blobName,
+                                            BlobUrl = blobUrl,
+                                            IsTrained = true
+                                        });
+                                    }
+                                    catch (Exception e)
+                                    {
+                                        _logger.LogWarning($"Error adding face to person group: {e.Message}");
+                                    }
+                                }
+                                else
+                                {
+                                    _logger.LogInformation($"Insuffucient quality for recognition for detected face. FaceId: {detectedFace.FaceId} Image: {imageName}");
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // TODO: This should be done in a background process
+                await TrainAndCheckStatusAsync(personGroupId.ToString(), faceClient, dbPersonFaces);
+            }
+            else
+            {
+               _logger.LogWarning($"Person group with id {personGroupId} not found.");
+            }
         }
 
         public async Task<string> GetTrainingStatusAsync(string personGroupId)
@@ -358,6 +470,31 @@ namespace PersonIdentificationApi.Services
             return croppedMs.ToArray();
         }
 
+        private async Task<IList<DetectedFace>> GetDetectedFaces(FaceClient faceClient, byte[] blobContent)
+        {
+            IList<DetectedFace> detectedFaces;
+
+            using (var detectionStream = new MemoryStream(blobContent))
+            {
+                detectedFaces = await faceClient.Face.DetectWithStreamAsync(detectionStream,
+                    recognitionModel: RECOGNITION_MODEL4,
+                    detectionModel: DetectionModel.Detection03,
+                    returnFaceAttributes: new List<FaceAttributeType> { FaceAttributeType.QualityForRecognition });
+            }
+
+            return detectedFaces;
+        }
+
+        /// <summary>
+        /// Trains and checks status. Assumes that a set of images have been trained and a person group has been created.
+        /// </summary>
+        /// <param name="personGroupId"></param>
+        /// <param name="faceClient"></param>
+        /// <param name="dbPersonGroup"></param>
+        /// <param name="dbPersonGroupPeople"></param>
+        /// <param name="dbPersonFaces"></param>
+        /// <returns></returns>
+        /// <exception cref="Exception"></exception>
         private async Task TrainAndCheckStatusAsync(
             string personGroupId, 
             FaceClient faceClient, 
@@ -378,8 +515,44 @@ namespace PersonIdentificationApi.Services
 
                 if (trainingStatus.Status == TrainingStatusType.Succeeded)
                 {
-                    dbPersonGroup.IsTrained = true;
-                    await _personGroupRepository.SavePersonGroupAllAsync(dbPersonGroup, dbPersonGroupPeople, dbPersonFaces);
+                    await _personGroupRepository.CreatePersonGroupAllAsync(dbPersonGroup, dbPersonGroupPeople, dbPersonFaces);
+                    break;
+                }
+
+                if (trainingStatus.Status == TrainingStatusType.Failed)
+                {
+                    throw new Exception("Training failed");
+                }
+            }
+        }
+
+        /// <summary>
+        /// Trains and checks status. Assumes a group is already created and new faces are being added for training.
+        /// </summary>
+        /// <param name="personGroupId"></param>
+        /// <param name="faceClient"></param>
+        /// <param name="dbPersonFaces"></param>
+        /// <returns></returns>
+        /// <exception cref="Exception"></exception>
+        private async Task TrainAndCheckStatusAsync(
+            string personGroupId,
+            FaceClient faceClient,
+            List<DbPersonGroupPersonFace> dbPersonFaces)
+        {
+            // TODO: This should be done in a background process
+            await faceClient.PersonGroup.TrainAsync(personGroupId);
+
+            // TODO: This should be done in a background process
+            while (true)
+            {
+                await Task.Delay(1000);
+                var trainingStatus = await faceClient.PersonGroup.GetTrainingStatusAsync(personGroupId);
+
+                _logger.LogInformation($"Training status: {trainingStatus.Status}. Message: {trainingStatus.Message}");
+
+                if (trainingStatus.Status == TrainingStatusType.Succeeded)
+                {
+                    await _personGroupRepository.AddFacesToPersonGroup(personGroupId, dbPersonFaces);
                     break;
                 }
 
