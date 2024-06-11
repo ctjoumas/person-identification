@@ -4,7 +4,6 @@
     using PersonIdentificationApi.Models;
     using PersonIdentificationApi.Services;
     using System.Text.Json;
-    using System.Text.RegularExpressions;
 
     [ApiController]
     [Route("[controller]")]
@@ -53,7 +52,7 @@
         [ProducesResponseType(200)]
         [ProducesResponseType(400)]
         [ProducesResponseType(500)]
-        public async Task<ActionResult> TrainingRunner([FromBody] TrainingRequest trainingRequest)
+        public async Task<ActionResult> CreateTrainingGroup([FromBody] TrainingRequest trainingRequest)
         {
             try
             {
@@ -90,9 +89,75 @@
                 }
 
                 // run the training process
-                var groupId = await _faceService.TrainAsync(imagesToTrain, trainingRequest.PersonGroupName, trainingRequest.ProcessTrainingModel.PersonName);
+                var groupId = await _faceService.TrainNewGroupAsync(imagesToTrain, trainingRequest.PersonGroupName, trainingRequest.ProcessTrainingModel.PersonName);
 
                 return Ok(groupId);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, ex.Message);
+            }
+        }
+
+        /// <summary>
+        /// This API will accept a JSON payload in the format of:
+        /// {
+        ///   "personGroupName": "",
+        ///   "processTrainingModel": {
+        ///     "personName": "",
+        ///     "images": [
+        ///       {
+        ///         "filename": "<name of file>"
+        ///       }
+        ///     ]
+        ///   }
+        /// }
+        /// </summary>
+        /// <returns>Group Id Created</returns>
+        [HttpPut("training/train")]
+        [ProducesResponseType(200)]
+        [ProducesResponseType(400)]
+        [ProducesResponseType(500)]
+        public async Task<ActionResult> TrainExistingGroup([FromBody] TrainingRequest trainingRequest)
+        {
+            try
+            {
+                if (trainingRequest.ProcessTrainingModel.Images.Count == 0)
+                {
+                    return BadRequest("No images provided for training");
+                }
+
+                if (string.IsNullOrEmpty(trainingRequest.ProcessTrainingModel.PersonName))
+                {
+                    return BadRequest("No person name provided for training");
+                }
+
+                if (string.IsNullOrEmpty(trainingRequest.PersonGroupId))
+                {
+                    return BadRequest("No group id provided for training");
+                }
+
+                var imagesToTrain = new List<string>();
+
+                // get the URI of each image in the container
+                foreach (Image image in trainingRequest.ProcessTrainingModel.Images)
+                {
+                    Uri imageUri = _blobUtility.GetBlobSasUri(image.Filename);
+
+                    if (imageUri == null)
+                    {
+                        _logger.LogWarning($"File does not exist: {image.Filename}");
+                    }
+                    else
+                    {
+                        imagesToTrain.Add(imageUri.ToString());
+                    }
+                }
+
+                // run the training process
+                await _faceService.TrainExistingGroup(imagesToTrain, trainingRequest.PersonGroupId, trainingRequest.ProcessTrainingModel.PersonName);
+
+                return Ok();
             }
             catch (Exception ex)
             {
@@ -115,7 +180,7 @@
         [ProducesResponseType(200)]
         [ProducesResponseType(400)]
         [ProducesResponseType(500)]
-        public async Task<ActionResult> IdentificationRunner([FromBody] ProcessIdentificationModel processModel)
+        public async Task<ActionResult> Identification([FromBody] ProcessIdentificationModel processModel)
         {
             List<DetectedFaceResponse> identificationResponse = new List<DetectedFaceResponse>();
             try
