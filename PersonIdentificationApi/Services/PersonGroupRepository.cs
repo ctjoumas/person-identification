@@ -126,7 +126,7 @@ namespace PersonIdentificationApi.Services
             }
         }
 
-        public async Task AddFacesToPersonGroup(string personGroupId, List<DbPersonGroupPersonFace> dbPersonFaces)
+        public async Task AddFacesToExistingPerson(string personGroupId, List<DbPersonGroupPerson> dbPersonGroupPeople, List<DbPersonGroupPersonFace> dbPersonFaces)
         {
             using IDbConnection dbConnection = new SqlConnection(_connectionString);
             dbConnection.Open();
@@ -142,6 +142,14 @@ namespace PersonIdentificationApi.Services
                 WHERE PersonGroupId = @PersonGroupId";
   
                 await dbConnection.ExecuteAsync(query, new { PersonGroupId = personGroupId }, transaction);
+
+                if (dbPersonGroupPeople.Any())
+                {
+                    foreach (var dbPersonGroupImage in dbPersonGroupPeople)
+                    {
+                        await InsertPersonGroupPersonsync(dbConnection, dbPersonGroupImage, transaction);
+                    }
+                }
 
                 foreach (var dbPersonFace in dbPersonFaces)
                 {
