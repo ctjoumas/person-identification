@@ -53,7 +53,8 @@ namespace PersonIdentificationApi.Services
                 pgp.PersonName                
                 FROM [dbo].[PersonGroup] pg
                 JOIN [dbo].[PersonGroupPerson] pgp on pg.PersonGroupId = pgp.PersonGroupId
-                WHERE pg.IsTrained = 1";
+                JOIN [dbo].[PersonGroupPersonFace] f on pgp.PersonId = f.PersonId
+                WHERE f.IsTrained = 1";
 
             var dbDetectionResults = await dbConnection.QueryAsync<DbDetectionResult>(query);
 
