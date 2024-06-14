@@ -5,6 +5,7 @@ using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.PixelFormats;
 using SixLabors.ImageSharp.Processing;
 using SixLabors.ImageSharp.Formats.Png;
+using SixLabors.ImageSharp.Drawing.Processing;
 
 namespace PersonIdentificationApi.Services
 {
@@ -62,70 +63,78 @@ namespace PersonIdentificationApi.Services
 
                     var segmentationModels = JsonSerializer.Deserialize<SegmentationModel[]>(result);
 
-                    // get the width and height of the source image and use this to create each segment image
-                    // this is possibly not needed and we can create a standard width/height
-                    int x, y;
+                    // Get the dimensions of the source image
+                    int imageWidth, imageHeight;
                     using (var imageStream = new MemoryStream(imageByteStream))
                     using (var image = SixLabors.ImageSharp.Image.Load<Rgba32>(imageStream))
                     {
-                        x = image.Size.Width;
-                        y = image.Size.Height;
+                        imageWidth = image.Size.Width;
+                        imageHeight = image.Size.Height;
                     }
 
                     int segmentNumber = 1;
 
-                    // there is only one element in the array, so start from there
+                    // Process each segment identified by the ML model
                     var segmentationModel = segmentationModels[0];
                     foreach (var box in segmentationModel.Boxes)
                     {
-                        // only process this segment if it's a person that is identified
+                        // Only process if the segment is identified as a person with a high confidence score
                         if (box.Label.TrimEnd('\n').ToLower().Equals("person") && box.Score > 0.9)
                         {
-                            List<PointF> pointFs = new List<PointF>();
+                            List<PointF> points = new List<PointF>();
 
-                            // push the list of coordinates in the polygon to pairs of (x, y) points
+                            // Convert polygon coordinates to image scale
                             for (int i = 0; i < box.Polygon[0].Count - 1; i += 2)
                             {
-                                //PointF point = new PointF(box.Polygon[0][i], box.Polygon[0][i + 1]);
-                                PointF point = new PointF(box.Polygon[0][i] * x, box.Polygon[0][i + 1] * y);
-                                pointFs.Add(point);
+                                PointF point = new PointF(box.Polygon[0][i] * imageWidth, box.Polygon[0][i + 1] * imageHeight);
+                                points.Add(point);
                             }
 
                             using (var inStream = new MemoryStream(imageByteStream))
-                            // uncomment this if you want to see the dashed outline of this segment on the original image
-                            //using (var outStream = File.Create("C:\\Code With\\NBA\\test.png"))
-                            // uncomment this if you want to see the segment saved as a separate image (extracted from a group of segments in the original image)
-                            //using (var outStream2 = File.Create("C:\\Code With\\NBA\\polygon.png"))
                             using (var image = SixLabors.ImageSharp.Image.Load<Rgba32>(inStream))
                             {
-                                var pathBuilder = new SixLabors.ImageSharp.Drawing.PathBuilder();
-                                pathBuilder.AddLines(pointFs.ToArray());
-                                var path = pathBuilder.Build();
+                                // Create a mask image
+                                Image<Rgba32> mask = new Image<Rgba32>(imageWidth, imageHeight);
+                                mask.Mutate(ctx =>
+                                {
+                                    ctx.Clear(Color.Transparent);
+                                    var pathBuilder = new SixLabors.ImageSharp.Drawing.PathBuilder();
+                                    pathBuilder.AddLines(points.ToArray());
+                                    var path = pathBuilder.Build();
+                                    ctx.Fill(Color.White, path);
+                                });
 
-                                int polygonWidth = (int)(box.Box.BottomX * x - box.Box.TopX * x);
-                                int polygonHeight = (int)(box.Box.BottomY * y - box.Box.TopY * y);
-                                Image<Rgba32> newImage = new Image<Rgba32>(polygonWidth, polygonHeight);
-                                SixLabors.ImageSharp.Drawing.Polygon polygon = new SixLabors.ImageSharp.Drawing.Polygon(pointFs.ToArray());
+                                // Apply the mask to the original image
+                                image.Mutate(ctx =>
+                                {
+                                    ctx.DrawImage(mask, PixelColorBlendingMode.Normal, PixelAlphaCompositionMode.DestIn, 1.0f);
+                                });
 
-                                MemoryStream polygonStream = new MemoryStream();
-                                // crop the rectangular bounds of the polygon from the image and save it to the stream
-                                newImage = image.Clone(c => c.Crop((Rectangle)polygon.Bounds));
-                                newImage.Save(polygonStream, new PngEncoder());
+                                // Calculate the bounding box of the polygon
+                                var bounds = new SixLabors.ImageSharp.Drawing.PathBuilder()
+                                                .AddLines(points.ToArray())
+                                                .Build()
+                                                .Bounds;
 
-                                // upload this segment to the storage account container and save the name to the list so it
-                                // can be later passed to the face identification service
-                                int lastDotIndex = fileName.LastIndexOf('.');
-                                string segmentFileName = fileName.Insert(lastDotIndex, $"_{segmentNumber}");
-                                await _blobUtility.UploadFromStreamAsync(polygonStream, segmentFileName);
+                                // Crop the image to the bounding box of the polygon
+                                var croppedImage = image.Clone(ctx => ctx.Crop(new Rectangle((int)bounds.Left, (int)bounds.Top, (int)bounds.Width, (int)bounds.Height)));
 
-                                segmentImages.Add(segmentFileName);
+                                // Create a new image with a white background
+                                var finalImage = new Image<Rgba32>((int)bounds.Width, (int)bounds.Height);
+                                finalImage.Mutate(ctx => ctx.Fill(Color.White));
 
-                                // uncomment this line to save the segment image to local disk
-                                //newImage.Save(outStream2, new JpegEncoder());
+                                // Draw the cropped image onto the new image with a white background
+                                finalImage.Mutate(ctx => ctx.DrawImage(croppedImage, new Point(0, 0), 1.0f));
 
-                                // uncomment out these lines if you want to save and view the segment
-                                //image.Mutate(x => x.DrawPolygon(Pens.DashDotDot(Color.Red, 5), pointFs.ToArray()));
-                                //image.Save(outStream, new JpegEncoder());
+                                // Save the new image
+                                using (var polygonStream = new MemoryStream())
+                                {
+                                    finalImage.Save(polygonStream, new PngEncoder());
+                                    // You can use polygonStream to save the image to a desired location or return it as needed
+                                    int lastDotIndex = fileName.LastIndexOf('.');
+                                    string segmentFileName = fileName.Insert(lastDotIndex, $"_{segmentNumber}");
+                                    await _blobUtility.UploadFromStreamAsync(polygonStream, segmentFileName);
+                                }
                             }
 
                             _logger.LogInformation(box.Label);
@@ -134,6 +143,7 @@ namespace PersonIdentificationApi.Services
                             _logger.LogInformation(box.Polygon.ToString());
 
                             segmentNumber++;
+
                         }
                     }
 
