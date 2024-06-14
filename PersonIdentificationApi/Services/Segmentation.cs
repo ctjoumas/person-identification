@@ -48,7 +48,6 @@ namespace PersonIdentificationApi.Services
             List<string> segmentImages = new List<string>();
 
             // gets the byte array of the segment / image
-
             byte[] imageByteStream = _blobUtility.DownloadBlobStreamAsync(imageUrl).Result;
 
             if (imageByteStream != null)
@@ -143,7 +142,6 @@ namespace PersonIdentificationApi.Services
                             _logger.LogInformation(box.Polygon.ToString());
 
                             segmentNumber++;
-
                         }
                     }
 
